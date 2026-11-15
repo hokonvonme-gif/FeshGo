@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fesh Relay</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 40px auto; padding: 0 16px; color: #111; }
+    h1 { font-size: 1.25rem; }
+    code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 0.85rem; }
+    .ok { color: #059669; }
+    .err { color: #dc2626; }
+  </style>
+</head>
+<body>
+  <h1>Fesh — relais e-mail</h1>
+  <p>Page de relais (comme YAKA). Héberge ce fichier sur <strong>GitHub Pages</strong>.</p>
+  <p>Le backend Fesh envoie un POST JSON vers l’URL de ton <strong>Google Apps Script</strong> (déployé en Web App, accès « Anyone »).</p>
+
+  <h2>1. Google Apps Script</h2>
+  <p>Crée un script sur <a href="https://script.google.com" target="_blank">script.google.com</a> avec ce code :</p>
+  <pre style="background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;overflow:auto;font-size:12px;">function doPost(e) {
+  try {
+    var data = JSON.parse(e.postData.contents);
+    var to = data.to;
+    var subject = data.subject || ("Fesh — message de " + (data.from || "un étudiant"));
+    var body = (data.from || "Un étudiant") + " t'a écrit sur Fesh :\n\n"
+             + (data.message || "") + "\n\n— Ouvre l'app Fesh pour répondre.";
+    if (!to) return ContentService.createTextOutput(JSON.stringify({ok:false,error:"to missing"}))
+      .setMimeType(ContentService.MimeType.JSON);
+    MailApp.sendEmail({ to: to, subject: subject, body: body });
+    return ContentService.createTextOutput(JSON.stringify({ok:true}))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ok:false,error:String(err)}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doGet() {
+  return ContentService.createTextOutput("Fesh relay OK");
+}</pre>
+
+  <h2>2. Déploiement Google</h2>
+  <ol>
+    <li>Déployer → Nouvelle déploiement → Type : <strong>Application Web</strong></li>
+    <li>Exécuter en tant que : <strong>Moi</strong></li>
+    <li>Qui peut y accéder : <strong>Tout le monde</strong></li>
+    <li>Copier l’URL du déploiement (se termine souvent par <code>/exec</code>)</li>
+  </ol>
+
+  <h2>3. Backend Fesh (.env)</h2>
+  <pre style="background:#f1f5f9;padding:12px;border-radius:8px;">RELAY_URL=https://script.google.com/macros/s/XXXX/exec</pre>
+
+  <p class="ok">Quand un message est envoyé dans Fesh, le destinataire reçoit un vrai e-mail dans sa boîte.</p>
+</body>
+</html>
