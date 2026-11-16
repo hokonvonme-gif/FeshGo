@@ -5,53 +5,85 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Fesh Relay</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 40px auto; padding: 0 16px; color: #111; }
+    body { font-family: system-ui, sans-serif; max-width: 560px; margin: 40px auto; padding: 0 16px; color: #111; line-height: 1.45; }
     h1 { font-size: 1.25rem; }
-    code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 0.85rem; }
+    h2 { font-size: 1.05rem; margin-top: 1.6rem; }
+    code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 0.85rem; word-break: break-all; }
     .ok { color: #059669; }
     .err { color: #dc2626; }
+    .warn { background: #fff7ed; border: 1px solid #fdba74; padding: 12px; border-radius: 8px; }
+    ol li { margin: 6px 0; }
   </style>
 </head>
 <body>
-  <h1>Fesh — relais e-mail</h1>
-  <p>Page de relais (comme YAKA). Héberge ce fichier sur <strong>GitHub Pages</strong>.</p>
-  <p>Le backend Fesh envoie un POST JSON vers l’URL de ton <strong>Google Apps Script</strong> (déployé en Web App, accès « Anyone »).</p>
+  <h1>Fesh — relais e-mail (Google Apps Script)</h1>
+  <p class="warn"><strong>Important :</strong> le backend n’envoie un e-mail que si <code>RELAY_URL</code> est défini dans les variables d’environnement <strong>Render</strong>, et (par défaut) seulement si le destinataire est <strong>hors ligne</strong> dans l’app.</p>
 
   <h2>1. Google Apps Script</h2>
-  <p>Crée un script sur <a href="https://script.google.com" target="_blank">script.google.com</a> avec ce code :</p>
+  <p>Va sur <a href="https://script.google.com" target="_blank">script.google.com</a> → Nouveau projet → colle ce code :</p>
   <pre style="background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;overflow:auto;font-size:12px;">function doPost(e) {
   try {
-    var data = JSON.parse(e.postData.contents);
+    var raw = (e && e.postData && e.postData.contents) ? e.postData.contents : "{}";
+    var data = JSON.parse(raw);
     var to = data.to;
+    if (!to) {
+      return ContentService
+        .createTextOutput(JSON.stringify({ ok: false, error: "to missing" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
     var subject = data.subject || ("Fesh — message de " + (data.from || "un étudiant"));
     var body = (data.from || "Un étudiant") + " t'a écrit sur Fesh :\n\n"
              + (data.message || "") + "\n\n— Ouvre l'app Fesh pour répondre.";
-    if (!to) return ContentService.createTextOutput(JSON.stringify({ok:false,error:"to missing"}))
-      .setMimeType(ContentService.MimeType.JSON);
-    MailApp.sendEmail({ to: to, subject: subject, body: body });
-    return ContentService.createTextOutput(JSON.stringify({ok:true}))
+    MailApp.sendEmail({ to: to, subject: subject, body: body, name: "Fesh" });
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true }))
       .setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({ok:false,error:String(err)}))
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: false, error: String(err) }))
       .setMimeType(ContentService.MimeType.JSON);
   }
 }
 
-function doGet() {
-  return ContentService.createTextOutput("Fesh relay OK");
+function doGet(e) {
+  // Test simple dans le navigateur
+  return ContentService.createTextOutput("Fesh relay OK — " + new Date().toISOString());
 }</pre>
 
-  <h2>2. Déploiement Google</h2>
+  <h2>2. Déploiement (à faire exactement comme ceci)</h2>
   <ol>
-    <li>Déployer → Nouvelle déploiement → Type : <strong>Application Web</strong></li>
-    <li>Exécuter en tant que : <strong>Moi</strong></li>
-    <li>Qui peut y accéder : <strong>Tout le monde</strong></li>
-    <li>Copier l’URL du déploiement (se termine souvent par <code>/exec</code>)</li>
+    <li><strong>Déployer</strong> → <strong>Nouveau déploiement</strong></li>
+    <li>Type : <strong>Application Web</strong></li>
+    <li>Description : <code>fesh-relay</code></li>
+    <li>Exécuter en tant que : <strong>Moi</strong> (ton compte Gmail)</li>
+    <li>Qui peut y accéder : <strong>Tout le monde</strong> (Anyone)</li>
+    <li>Déployer → autorise les permissions Gmail si demandé</li>
+    <li>Copie l’URL qui se termine par <code>/exec</code></li>
   </ol>
+  <p>Ouvre cette URL dans le navigateur : tu dois voir <code>Fesh relay OK</code>.</p>
 
-  <h2>3. Backend Fesh (.env)</h2>
+  <h2>3. Variable d’environnement Render</h2>
+  <p>Dashboard Render → ton service <strong>Fesh</strong> → <strong>Environment</strong> → ajoute :</p>
   <pre style="background:#f1f5f9;padding:12px;border-radius:8px;">RELAY_URL=https://script.google.com/macros/s/XXXX/exec</pre>
+  <p>Puis <strong>Save</strong> → le service redémarre.</p>
+  <p>Optionnel pour tester même si l’app est ouverte :</p>
+  <pre style="background:#f1f5f9;padding:12px;border-radius:8px;">NOTIFY_EVEN_IF_ONLINE=1
+NOTIFY_COOLDOWN_MIN=1</pre>
 
-  <p class="ok">Quand un message est envoyé dans Fesh, le destinataire reçoit un vrai e-mail dans sa boîte.</p>
+  <h2>4. Test immédiat</h2>
+  <p>Dans le navigateur (après redeploy) :</p>
+  <pre style="background:#f1f5f9;padding:12px;border-radius:8px;">https://fesh.onrender.com/api/test-relay?to=TON_EMAIL@gmail.com</pre>
+  <p>Puis vérifie <strong>Boîte de réception</strong> et <strong>Spam / Courrier indésirable</strong> sous 1–2 minutes.</p>
+  <p>Vérifie aussi les logs Render : tu dois voir une ligne <code>Relay → … status=200</code>.</p>
+
+  <h2>Pourquoi tu ne reçois rien d’habitude</h2>
+  <ul>
+    <li><code>RELAY_URL</code> pas défini sur Render</li>
+    <li>Destinataire encore connecté dans Fesh (notification e-mail désactivée si en ligne)</li>
+    <li>E-mail dans les spams</li>
+    <li>Ancien déploiement Apps Script (il faut un nouveau déploiement après chaque modification du code)</li>
+    <li>Quota Gmail / autorisations non accordées au script</li>
+  </ul>
+  <p class="ok">Quand le test <code>/api/test-relay</code> fonctionne, les vrais messages Fesh enverront aussi des e-mails.</p>
 </body>
 </html>
